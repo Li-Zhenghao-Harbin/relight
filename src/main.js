@@ -122,6 +122,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 viewer.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -132,6 +134,15 @@ controls.maxDistance = 8;
 scene.add(new THREE.AmbientLight(0xffffff, 0.26));
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
 keyLight.position.set(1.5, 1.2, 1.8);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 0.1;
+keyLight.shadow.camera.far = 20;
+keyLight.shadow.camera.left = -2.5;
+keyLight.shadow.camera.right = 2.5;
+keyLight.shadow.camera.top = 2.5;
+keyLight.shadow.camera.bottom = -2.5;
+keyLight.shadow.bias = -0.0004;
 scene.add(keyLight);
 
 const rimLight = new THREE.DirectionalLight(0xaaccff, 0.9);
@@ -278,6 +289,8 @@ function buildExportMesh(exportMode = 'baked') {
   const exportedMesh = state.mesh.clone();
   exportedMesh.geometry = state.mesh.geometry.clone();
   exportedMesh.material = state.mesh.material.clone();
+  exportedMesh.castShadow = true;
+  exportedMesh.receiveShadow = true;
 
   if (exportMode !== 'baked') {
     return exportedMesh;
@@ -380,6 +393,8 @@ async function importModelForLighting() {
     root.traverse((node) => {
       if (node.isMesh) {
         node.frustumCulled = false;
+        node.castShadow = true;
+        node.receiveShadow = true;
       }
     });
 
@@ -453,6 +468,8 @@ async function applyMaps() {
     });
 
     state.mesh = new THREE.Mesh(state.geometry, state.material);
+    state.mesh.castShadow = true;
+    state.mesh.receiveShadow = true;
     scene.add(state.mesh);
 
     setStatus(

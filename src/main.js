@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 document.querySelector('#app').innerHTML = `
   <div class="layout">
@@ -49,6 +50,30 @@ document.querySelector('#app').innerHTML = `
         </label>
       </section>
 
+      <section class="group">
+        <h2>主光源位置（XYZ）</h2>
+        <label>Light X
+          <input id="lightX" type="range" min="-5" max="5" step="0.01" value="1.5" />
+          <span id="lightXValue">1.50</span>
+        </label>
+        <label>Light Y
+          <input id="lightY" type="range" min="-5" max="5" step="0.01" value="1.2" />
+          <span id="lightYValue">1.20</span>
+        </label>
+        <label>Light Z
+          <input id="lightZ" type="range" min="-5" max="5" step="0.01" value="1.8" />
+          <span id="lightZValue">1.80</span>
+        </label>
+      </section>
+
+      <section class="group">
+        <h2>导入模型到打光场景</h2>
+        <label>GLB / GLTF
+          <input id="importModel" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
+        </label>
+        <button id="importBtn">导入模型并打光</button>
+      </section>
+
       <section class="group actions">
         <button id="applyBtn">应用贴图并预览</button>
         <button id="exportBtn">导出 GLB</button>
@@ -67,6 +92,7 @@ const state = {
   textures: {},
   objectUrls: [],
   mesh: null,
+  importedRoot: null,
   material: null,
   geometry: null,
   dimensions: { width: 1, height: 1 }
@@ -126,7 +152,33 @@ function disposeCurrentMesh() {
     scene.remove(state.mesh);
     state.mesh.geometry.dispose();
     state.mesh.material.dispose();
+    state.mesh = null;
   }
+}
+
+function disposeMaterial(material) {
+  if (!material) return;
+  Object.values(material).forEach((value) => {
+    if (value && value.isTexture) {
+      value.dispose();
+    }
+  });
+  material.dispose();
+}
+
+function disposeImportedRoot() {
+  if (!state.importedRoot) return;
+  scene.remove(state.importedRoot);
+  state.importedRoot.traverse((node) => {
+    if (!node.isMesh) return;
+    node.geometry?.dispose();
+    if (Array.isArray(node.material)) {
+      node.material.forEach(disposeMaterial);
+    } else {
+      disposeMaterial(node.material);
+    }
+  });
+  state.importedRoot = null;
 }
 
 function cleanupTextures() {
@@ -255,10 +307,83 @@ function buildExportMesh() {
   return exportedMesh;
 }
 
+function fitCameraToObject(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  if (box.isEmpty()) return;
+
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z, 0.001);
+  const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+  const distance = (maxSize / Math.tan(halfFov)) * 0.75;
+
+  controls.target.copy(center);
+  camera.position.set(center.x, center.y, center.z + distance);
+  camera.near = Math.max(distance / 100, 0.01);
+  camera.far = Math.max(distance * 100, 100);
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+async function importModelForLighting() {
+  const input = document.getElementById('importModel');
+  if (!input.files || input.files.length === 0) {
+    setStatus('请先选择一个 GLB/GLTF 文件。', true);
+    return;
+  }
+
+  const file = input.files[0];
+  const fileName = file.name.toLowerCase();
+  setStatus(`正在导入模型：${file.name}`);
+
+  try {
+    disposeCurrentMesh();
+    cleanupTextures();
+    disposeImportedRoot();
+
+    const loader = new GLTFLoader();
+    let parseInput;
+
+    if (fileName.endsWith('.glb')) {
+      parseInput = await file.arrayBuffer();
+    } else if (fileName.endsWith('.gltf')) {
+      parseInput = await file.text();
+    } else {
+      setStatus('仅支持导入 .glb 或 .gltf 文件。', true);
+      return;
+    }
+
+    const gltf = await new Promise((resolve, reject) => {
+      loader.parse(parseInput, '', resolve, reject);
+    });
+
+    const root = gltf.scene || gltf.scenes?.[0];
+    if (!root) {
+      setStatus('导入失败：文件中没有可用场景。', true);
+      return;
+    }
+
+    root.traverse((node) => {
+      if (node.isMesh) {
+        node.frustumCulled = false;
+      }
+    });
+
+    state.importedRoot = root;
+    scene.add(root);
+    fitCameraToObject(root);
+
+    setStatus('导入成功：可拖动下方 Light X/Y/Z 实时打光。');
+  } catch (error) {
+    setStatus(`模型导入失败：${error?.message || '未知错误'}`, true);
+  }
+}
+
 async function applyMaps() {
   setStatus('正在加载贴图...');
 
   try {
+    disposeImportedRoot();
     cleanupTextures();
     disposeCurrentMesh();
 
@@ -369,6 +494,7 @@ function exportGlb() {
 
 document.getElementById('applyBtn').addEventListener('click', applyMaps);
 document.getElementById('exportBtn').addEventListener('click', exportGlb);
+document.getElementById('importBtn').addEventListener('click', importModelForLighting);
 
 bindNumberDisplay('segments', 'segmentsValue');
 bindNumberDisplay('displacementScale', 'displacementScaleValue', (v) => v.toFixed(3));
@@ -376,6 +502,22 @@ bindNumberDisplay('displacementBias', 'displacementBiasValue', (v) => v.toFixed(
 bindNumberDisplay('normalScale', 'normalScaleValue', (v) => v.toFixed(2));
 bindNumberDisplay('roughnessValue', 'roughnessValueText', (v) => v.toFixed(2));
 bindNumberDisplay('metalnessValue', 'metalnessValueText', (v) => v.toFixed(2));
+bindNumberDisplay('lightX', 'lightXValue', (v) => v.toFixed(2));
+bindNumberDisplay('lightY', 'lightYValue', (v) => v.toFixed(2));
+bindNumberDisplay('lightZ', 'lightZValue', (v) => v.toFixed(2));
+
+function updateMainLightPosition() {
+  keyLight.position.set(
+    Number(document.getElementById('lightX').value),
+    Number(document.getElementById('lightY').value),
+    Number(document.getElementById('lightZ').value)
+  );
+}
+
+document.getElementById('lightX').addEventListener('input', updateMainLightPosition);
+document.getElementById('lightY').addEventListener('input', updateMainLightPosition);
+document.getElementById('lightZ').addEventListener('input', updateMainLightPosition);
+updateMainLightPosition();
 
 window.addEventListener('resize', updateRendererSize);
 updateRendererSize();

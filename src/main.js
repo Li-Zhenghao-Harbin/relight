@@ -74,6 +74,16 @@ document.querySelector('#app').innerHTML = `
         <button id="importBtn">导入模型并打光</button>
       </section>
 
+      <section class="group">
+        <h2>GLB 导出模式</h2>
+        <label>导出类型
+          <select id="exportMode">
+            <option value="baked">立体 GLB（Depth 烘焙为真实几何）</option>
+            <option value="flat">平面 GLB（保留材质位移贴图）</option>
+          </select>
+        </label>
+      </section>
+
       <section class="group actions">
         <button id="applyBtn">应用贴图并预览</button>
         <button id="exportBtn">导出 GLB</button>
@@ -262,12 +272,16 @@ function sampleDepthFromImageData(imageData, u, v) {
   return imageData.data[idx] / 255;
 }
 
-function buildExportMesh() {
+function buildExportMesh(exportMode = 'baked') {
   if (!state.mesh) return null;
 
   const exportedMesh = state.mesh.clone();
   exportedMesh.geometry = state.mesh.geometry.clone();
   exportedMesh.material = state.mesh.material.clone();
+
+  if (exportMode !== 'baked') {
+    return exportedMesh;
+  }
 
   const depthTex = exportedMesh.material.displacementMap;
   if (!depthTex) {
@@ -456,10 +470,12 @@ function exportGlb() {
     return;
   }
 
-  setStatus('正在导出 GLB（Depth 烘焙为真实网格）...');
+  const exportMode = document.getElementById('exportMode').value;
+  const isBaked = exportMode === 'baked';
+  setStatus(isBaked ? '正在导出立体 GLB（Depth 烘焙为真实网格）...' : '正在导出平面 GLB...');
 
   const exportScene = new THREE.Scene();
-  const meshToExport = buildExportMesh();
+  const meshToExport = buildExportMesh(exportMode);
   if (!meshToExport) {
     setStatus('导出失败：当前没有可导出的网格。', true);
     return;
@@ -480,10 +496,14 @@ function exportGlb() {
       const link = document.createElement('a');
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       link.href = url;
-      link.download = `face-relight-${ts}.glb`;
+      link.download = `face-relight-${isBaked ? 'baked' : 'flat'}-${ts}.glb`;
       link.click();
       URL.revokeObjectURL(url);
-      setStatus('导出成功：已下载立体 GLB（Depth 已烘焙为顶点几何）。');
+      setStatus(
+        isBaked
+          ? '导出成功：已下载立体 GLB（Depth 已烘焙为顶点几何）。'
+          : '导出成功：已下载平面 GLB（保留材质位移贴图语义）。'
+      );
     },
     (error) => {
       setStatus(`导出失败：${error?.message || '未知错误'}`, true);

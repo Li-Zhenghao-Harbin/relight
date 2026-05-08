@@ -79,6 +79,16 @@ input[type='range'] {
   width: 170px;
 }
 
+select {
+  width: 170px;
+  background: #0f1721;
+  color: #dbe5f5;
+  border: 1px solid #395782;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

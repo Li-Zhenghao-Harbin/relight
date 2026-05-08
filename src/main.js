@@ -177,6 +177,84 @@ function getAspectSize(width, height) {
   return { w: width / height, h: 1 };
 }
 
+function getTextureImageData(texture) {
+  const image = texture?.image;
+  if (!image) return null;
+
+  const width = image.width || image.videoWidth || 0;
+  const height = image.height || image.videoHeight || 0;
+  if (!width || !height) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.drawImage(image, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  return { data: imageData.data, width, height };
+}
+
+function sampleDepthFromImageData(imageData, u, v) {
+  if (!imageData) return 0;
+
+  const uu = THREE.MathUtils.clamp(u, 0, 1);
+  const vv = THREE.MathUtils.clamp(v, 0, 1);
+  const x = Math.min(imageData.width - 1, Math.max(0, Math.round(uu * (imageData.width - 1))));
+  const y = Math.min(
+    imageData.height - 1,
+    Math.max(0, Math.round((1 - vv) * (imageData.height - 1)))
+  );
+  const idx = (y * imageData.width + x) * 4;
+  return imageData.data[idx] / 255;
+}
+
+function buildExportMesh() {
+  if (!state.mesh) return null;
+
+  const exportedMesh = state.mesh.clone();
+  exportedMesh.geometry = state.mesh.geometry.clone();
+  exportedMesh.material = state.mesh.material.clone();
+
+  const depthTex = exportedMesh.material.displacementMap;
+  if (!depthTex) {
+    return exportedMesh;
+  }
+
+  const uvAttr = exportedMesh.geometry.getAttribute('uv');
+  const positionAttr = exportedMesh.geometry.getAttribute('position');
+  if (!uvAttr || !positionAttr) {
+    return exportedMesh;
+  }
+
+  const depthData = getTextureImageData(depthTex);
+  if (!depthData) {
+    return exportedMesh;
+  }
+
+  const displacementScale = exportedMesh.material.displacementScale || 0;
+  const displacementBias = exportedMesh.material.displacementBias || 0;
+
+  for (let i = 0; i < positionAttr.count; i += 1) {
+    const u = uvAttr.getX(i);
+    const v = uvAttr.getY(i);
+    const depth = sampleDepthFromImageData(depthData, u, v);
+    const displacedZ = depth * displacementScale + displacementBias;
+    positionAttr.setZ(i, displacedZ);
+  }
+
+  positionAttr.needsUpdate = true;
+  exportedMesh.geometry.computeVertexNormals();
+
+  // 真实几何已烘焙到顶点，导出时移除位移贴图，避免下游重复解释。
+  exportedMesh.material.displacementMap = null;
+  exportedMesh.material.displacementScale = 0;
+  exportedMesh.material.displacementBias = 0;
+
+  return exportedMesh;
+}
+
 async function applyMaps() {
   setStatus('正在加载贴图...');
 
@@ -253,10 +331,15 @@ function exportGlb() {
     return;
   }
 
-  setStatus('正在导出 GLB...');
+  setStatus('正在导出 GLB（Depth 烘焙为真实网格）...');
 
   const exportScene = new THREE.Scene();
-  exportScene.add(state.mesh.clone());
+  const meshToExport = buildExportMesh();
+  if (!meshToExport) {
+    setStatus('导出失败：当前没有可导出的网格。', true);
+    return;
+  }
+  exportScene.add(meshToExport);
 
   const exporter = new GLTFExporter();
   exporter.parse(
@@ -275,7 +358,7 @@ function exportGlb() {
       link.download = `face-relight-${ts}.glb`;
       link.click();
       URL.revokeObjectURL(url);
-      setStatus('导出成功：已下载 GLB，可直接用 GLTFLoader 导入 three.js。');
+      setStatus('导出成功：已下载立体 GLB（Depth 已烘焙为顶点几何）。');
     },
     (error) => {
       setStatus(`导出失败：${error?.message || '未知错误'}`, true);

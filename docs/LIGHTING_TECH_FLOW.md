@@ -61,16 +61,7 @@
 4. 构建 `MeshStandardMaterial`，挂接各类贴图
 5. 预览网格加入场景，并应用阴影标记
 
-### 3.2 导出 GLB
-
-主流程在：`src/features/pipeline/exporter.js`
-
-导出前读取 `exportMode`：
-
-- `flat`：直接导出当前网格与材质
-- `baked`：执行 depth 烘焙流程
-
-### 3.3 Camera Space Reconstruction（新增预处理步骤）
+### 3.2 Camera Space Reconstruction（导出前预处理）
 
 主流程在：`src/features/pipeline/exporter.js`
 
@@ -88,6 +79,15 @@
 5. 得到 point cloud（`Float32Array`），并保存到运行时状态中供后续步骤使用
 
 当前代码包含自适应采样步长（`stride`），用于控制点云规模并保持导出速度。
+
+### 3.3 导出 GLB
+
+主流程在：`src/features/pipeline/exporter.js`
+
+在完成 Camera Space Reconstruction 之后，进入导出流程并读取 `exportMode`：
+
+- `flat`：直接导出当前网格与材质
+- `baked`：执行 depth 烘焙流程
 
 ### 3.4 depth 烘焙为真实几何（关键）
 

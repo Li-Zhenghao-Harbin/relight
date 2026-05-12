@@ -5,12 +5,10 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 document.querySelector('#app').innerHTML = `
-  <div class="layout">
-    <aside class="panel">
-      <h1>2D -> 3D 贴图转换器</h1>
-      <p class="desc">
-        上传一张基础图（或 Albedo）即可开始；上传 Normal/Depth 后可以得到更真实的鼻梁侧向阴影。
-      </p>
+  <div class="app-shell">
+    <div class="top-layout">
+      <aside class="panel panel-left">
+      <h1>贴图打光</h1>
 
       <section class="group">
         <h2>贴图输入</h2>
@@ -51,30 +49,6 @@ document.querySelector('#app').innerHTML = `
       </section>
 
       <section class="group">
-        <h2>主光源位置（XYZ）</h2>
-        <label>Light X
-          <input id="lightX" type="range" min="-5" max="5" step="0.01" value="1.5" />
-          <span id="lightXValue">1.50</span>
-        </label>
-        <label>Light Y
-          <input id="lightY" type="range" min="-5" max="5" step="0.01" value="1.2" />
-          <span id="lightYValue">1.20</span>
-        </label>
-        <label>Light Z
-          <input id="lightZ" type="range" min="-5" max="5" step="0.01" value="1.8" />
-          <span id="lightZValue">1.80</span>
-        </label>
-      </section>
-
-      <section class="group">
-        <h2>导入模型到打光场景</h2>
-        <label>GLB / GLTF
-          <input id="importModel" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
-        </label>
-        <button id="importBtn">导入模型并打光</button>
-      </section>
-
-      <section class="group">
         <h2>GLB 导出模式</h2>
         <label>导出类型
           <select id="exportMode">
@@ -84,17 +58,82 @@ document.querySelector('#app').innerHTML = `
         </label>
       </section>
 
-      <section class="group actions">
+      <section class="group">
         <button id="applyBtn">应用贴图并预览</button>
+      </section>
+    </aside>
+
+      <main class="viewer-wrap">
+        <div id="viewer"></div>
+      </main>
+
+      <aside class="panel panel-right">
+        <section class="group">
+          <h2>主光源位置（XYZ）</h2>
+          <label>Light X
+            <input id="lightX" type="range" min="-5" max="5" step="0.01" value="1.5" />
+            <span id="lightXValue">1.50</span>
+          </label>
+          <label>Light Y
+            <input id="lightY" type="range" min="-5" max="5" step="0.01" value="1.2" />
+            <span id="lightYValue">1.20</span>
+          </label>
+          <label>Light Z
+            <input id="lightZ" type="range" min="-5" max="5" step="0.01" value="1.8" />
+            <span id="lightZValue">1.80</span>
+          </label>
+          <label>光源强度
+            <input id="lightIntensity" type="range" min="0" max="4" step="0.01" value="2.1" />
+            <span id="lightIntensityValue">2.10</span>
+          </label>
+        </section>
+
+        <section class="group">
+          <h2>阴影参数</h2>
+          <label>启用阴影
+            <input id="enableShadows" type="checkbox" checked />
+          </label>
+          <label>模型 Cast Shadow
+            <input id="modelCastShadow" type="checkbox" checked />
+          </label>
+          <label>模型 Receive Shadow
+            <input id="modelReceiveShadow" type="checkbox" checked />
+          </label>
+          <label>Shadow Map
+            <select id="shadowMapSize">
+              <option value="1024">1024</option>
+              <option value="2048" selected>2048</option>
+              <option value="4096">4096</option>
+            </select>
+          </label>
+          <label>Shadow Bias
+            <input id="shadowBias" type="range" min="-0.005" max="0.005" step="0.0001" value="-0.0001" />
+            <span id="shadowBiasValue">-0.0001</span>
+          </label>
+          <label>Shadow Normal Bias
+            <input id="shadowNormalBias" type="range" min="0" max="0.15" step="0.001" value="0.02" />
+            <span id="shadowNormalBiasValue">0.020</span>
+          </label>
+        </section>
+      </aside>
+    </div>
+
+    <footer class="bottom-bar">
+      <section class="group bottom-group">
+        <h2>导入模型到打光场景</h2>
+        <label>GLB / GLTF
+          <input id="importModel" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
+        </label>
+        <button id="importBtn">导入模型并打光</button>
+      </section>
+
+      <section class="group bottom-group">
+        <h2>导出</h2>
         <button id="exportBtn">导出 GLB</button>
       </section>
 
       <p id="status" class="status">等待上传贴图...</p>
-    </aside>
-
-    <main class="viewer-wrap">
-      <div id="viewer"></div>
-    </main>
+    </footer>
   </div>
 `;
 
@@ -142,7 +181,8 @@ keyLight.shadow.camera.left = -2.5;
 keyLight.shadow.camera.right = 2.5;
 keyLight.shadow.camera.top = 2.5;
 keyLight.shadow.camera.bottom = -2.5;
-keyLight.shadow.bias = -0.0004;
+keyLight.shadow.bias = -0.0001;
+keyLight.shadow.normalBias = 0.02;
 scene.add(keyLight);
 
 const rimLight = new THREE.DirectionalLight(0xaaccff, 0.9);
@@ -207,6 +247,50 @@ function cleanupTextures() {
   state.textures = {};
   state.objectUrls.forEach((url) => URL.revokeObjectURL(url));
   state.objectUrls = [];
+}
+
+function forEachSceneMesh(callback) {
+  if (state.mesh) {
+    callback(state.mesh);
+  }
+  if (state.importedRoot) {
+    state.importedRoot.traverse((node) => {
+      if (node.isMesh) callback(node);
+    });
+  }
+}
+
+function applyModelShadowFlags() {
+  const cast = document.getElementById('modelCastShadow').checked;
+  const receive = document.getElementById('modelReceiveShadow').checked;
+  forEachSceneMesh((mesh) => {
+    mesh.castShadow = cast;
+    mesh.receiveShadow = receive;
+  });
+}
+
+function updateShadowSettings() {
+  const enabled = document.getElementById('enableShadows').checked;
+  const mapSize = Number(document.getElementById('shadowMapSize').value);
+  const bias = Number(document.getElementById('shadowBias').value);
+  const normalBias = Number(document.getElementById('shadowNormalBias').value);
+  const intensity = Number(document.getElementById('lightIntensity').value);
+
+  renderer.shadowMap.enabled = enabled;
+  keyLight.castShadow = enabled;
+  keyLight.intensity = intensity;
+  keyLight.shadow.bias = bias;
+  keyLight.shadow.normalBias = normalBias;
+
+  if (keyLight.shadow.mapSize.x !== mapSize || keyLight.shadow.mapSize.y !== mapSize) {
+    keyLight.shadow.mapSize.set(mapSize, mapSize);
+    if (keyLight.shadow.map) {
+      keyLight.shadow.map.dispose();
+      keyLight.shadow.map = null;
+    }
+  }
+
+  applyModelShadowFlags();
 }
 
 async function loadTextureFromInput(inputId) {
@@ -289,8 +373,8 @@ function buildExportMesh(exportMode = 'baked') {
   const exportedMesh = state.mesh.clone();
   exportedMesh.geometry = state.mesh.geometry.clone();
   exportedMesh.material = state.mesh.material.clone();
-  exportedMesh.castShadow = true;
-  exportedMesh.receiveShadow = true;
+  exportedMesh.castShadow = document.getElementById('modelCastShadow').checked;
+  exportedMesh.receiveShadow = document.getElementById('modelReceiveShadow').checked;
 
   if (exportMode !== 'baked') {
     return exportedMesh;
@@ -368,20 +452,35 @@ async function importModelForLighting() {
     cleanupTextures();
     disposeImportedRoot();
 
-    const loader = new GLTFLoader();
-    let parseInput;
-
-    if (fileName.endsWith('.glb')) {
-      parseInput = await file.arrayBuffer();
-    } else if (fileName.endsWith('.gltf')) {
-      parseInput = await file.text();
-    } else {
+    if (!fileName.endsWith('.glb') && !fileName.endsWith('.gltf')) {
       setStatus('仅支持导入 .glb 或 .gltf 文件。', true);
       return;
     }
 
+    if (fileName.endsWith('.glb')) {
+      const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const glbMagic = String.fromCharCode(header[0], header[1], header[2], header[3]);
+      if (glbMagic !== 'glTF') {
+        setStatus('模型导入失败：该文件不是有效的 GLB（二进制头不匹配）。', true);
+        return;
+      }
+    }
+
+    const loader = new GLTFLoader();
+    const objectUrl = URL.createObjectURL(file);
     const gltf = await new Promise((resolve, reject) => {
-      loader.parse(parseInput, '', resolve, reject);
+      loader.load(
+        objectUrl,
+        (result) => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(result);
+        },
+        undefined,
+        (error) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(error);
+        }
+      );
     });
 
     const root = gltf.scene || gltf.scenes?.[0];
@@ -393,18 +492,22 @@ async function importModelForLighting() {
     root.traverse((node) => {
       if (node.isMesh) {
         node.frustumCulled = false;
-        node.castShadow = true;
-        node.receiveShadow = true;
       }
     });
 
     state.importedRoot = root;
     scene.add(root);
+    applyModelShadowFlags();
     fitCameraToObject(root);
 
     setStatus('导入成功：可拖动下方 Light X/Y/Z 实时打光。');
   } catch (error) {
-    setStatus(`模型导入失败：${error?.message || '未知错误'}`, true);
+    const message = `${error?.message || '未知错误'}`;
+    if (message.includes('Invalid typed array length')) {
+      setStatus('模型导入失败：文件可能已损坏，或该 GLTF 依赖外部 .bin/.贴图但未一起提供。建议优先使用内嵌资源的 .glb。', true);
+      return;
+    }
+    setStatus(`模型导入失败：${message}`, true);
   }
 }
 
@@ -468,9 +571,9 @@ async function applyMaps() {
     });
 
     state.mesh = new THREE.Mesh(state.geometry, state.material);
-    state.mesh.castShadow = true;
-    state.mesh.receiveShadow = true;
+    state.material.shadowSide = THREE.FrontSide;
     scene.add(state.mesh);
+    applyModelShadowFlags();
 
     setStatus(
       `已完成预览：${state.dimensions.width}x${state.dimensions.height}。` +
@@ -542,6 +645,9 @@ bindNumberDisplay('metalnessValue', 'metalnessValueText', (v) => v.toFixed(2));
 bindNumberDisplay('lightX', 'lightXValue', (v) => v.toFixed(2));
 bindNumberDisplay('lightY', 'lightYValue', (v) => v.toFixed(2));
 bindNumberDisplay('lightZ', 'lightZValue', (v) => v.toFixed(2));
+bindNumberDisplay('lightIntensity', 'lightIntensityValue', (v) => v.toFixed(2));
+bindNumberDisplay('shadowBias', 'shadowBiasValue', (v) => v.toFixed(4));
+bindNumberDisplay('shadowNormalBias', 'shadowNormalBiasValue', (v) => v.toFixed(3));
 
 function updateMainLightPosition() {
   keyLight.position.set(
@@ -554,7 +660,15 @@ function updateMainLightPosition() {
 document.getElementById('lightX').addEventListener('input', updateMainLightPosition);
 document.getElementById('lightY').addEventListener('input', updateMainLightPosition);
 document.getElementById('lightZ').addEventListener('input', updateMainLightPosition);
+document.getElementById('lightIntensity').addEventListener('input', updateShadowSettings);
+document.getElementById('enableShadows').addEventListener('change', updateShadowSettings);
+document.getElementById('modelCastShadow').addEventListener('change', updateShadowSettings);
+document.getElementById('modelReceiveShadow').addEventListener('change', updateShadowSettings);
+document.getElementById('shadowMapSize').addEventListener('change', updateShadowSettings);
+document.getElementById('shadowBias').addEventListener('input', updateShadowSettings);
+document.getElementById('shadowNormalBias').addEventListener('input', updateShadowSettings);
 updateMainLightPosition();
+updateShadowSettings();
 
 window.addEventListener('resize', updateRendererSize);
 updateRendererSize();

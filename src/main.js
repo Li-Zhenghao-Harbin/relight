@@ -13,7 +13,7 @@ document.querySelector('#app').innerHTML = `
 
     <div class="top-layout">
       <aside class="panel panel-left">
-      <h1>贴图打光</h1>
+      <h1 id="panelLeftTitle">生成与导出</h1>
 
       <section class="group" data-mode-only="build">
         <h2>贴图输入</h2>
@@ -67,10 +67,25 @@ document.querySelector('#app').innerHTML = `
         <button id="applyBtn">应用贴图并预览</button>
       </section>
 
+      <section class="group" data-mode-only="build">
+        <h2>导出</h2>
+        <button id="exportBtn">导出 GLB</button>
+      </section>
+
       <section class="group" data-mode-only="import">
         <h2>导入模式说明</h2>
         <p class="desc">当前模式用于加载已有 GLB/GLTF，并在右侧参数中实时调光和阴影。</p>
       </section>
+
+      <section class="group" data-mode-only="import">
+        <h2>导入模型到打光场景</h2>
+        <label>GLB / GLTF
+          <input id="importModel" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
+        </label>
+        <button id="importBtn">导入模型并打光</button>
+      </section>
+
+      <p id="status" class="status status-panel">等待上传贴图...</p>
     </aside>
 
       <main class="viewer-wrap">
@@ -127,23 +142,6 @@ document.querySelector('#app').innerHTML = `
         </section>
       </aside>
     </div>
-
-    <footer class="bottom-bar">
-      <section class="group bottom-group" data-mode-only="import">
-        <h2>导入模型到打光场景</h2>
-        <label>GLB / GLTF
-          <input id="importModel" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
-        </label>
-        <button id="importBtn">导入模型并打光</button>
-      </section>
-
-      <section class="group bottom-group" data-mode-only="build">
-        <h2>导出</h2>
-        <button id="exportBtn">导出 GLB</button>
-      </section>
-
-      <p id="status" class="status">等待上传贴图...</p>
-    </footer>
   </div>
 `;
 
@@ -214,6 +212,11 @@ function setUiMode(mode) {
 
   document.getElementById('modeBuildBtn')?.classList.toggle('is-active', mode === 'build');
   document.getElementById('modeImportBtn')?.classList.toggle('is-active', mode === 'import');
+
+  const titleEl = document.getElementById('panelLeftTitle');
+  if (titleEl) {
+    titleEl.textContent = mode === 'build' ? '生成与导出' : '导入与打光';
+  }
 }
 
 function updateRendererSize() {
@@ -549,7 +552,7 @@ async function importModelForLighting() {
     applyModelShadowFlags();
     fitCameraToObject(root);
 
-    setStatus('导入成功：可拖动下方 Light X/Y/Z 实时打光。');
+    setStatus('导入成功：可在右侧调节 Light X/Y/Z 与阴影参数。');
   } catch (error) {
     const message = `${error?.message || '未知错误'}`;
     if (message.includes('Invalid typed array length')) {

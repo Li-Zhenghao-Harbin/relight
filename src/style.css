@@ -163,6 +163,14 @@ button:hover {
   align-items: center;
 }
 
+.status-panel {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid #25384c;
+  border-radius: 10px;
+  background: #0f1721;
+}
+
 .status.error {
   color: #ff9b9b;
 }
@@ -181,27 +189,9 @@ button:hover {
   min-height: 520px;
 }
 
-.bottom-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr;
-  gap: 12px;
-  padding: 12px;
-  border-top: 1px solid #243243;
-  background: #111a24;
-}
-
-.bottom-group {
-  margin: 0;
-}
-
 .app-shell[data-mode='build'] [data-mode-only='import'],
 .app-shell[data-mode='import'] [data-mode-only='build'] {
   display: none;
-}
-
-.app-shell[data-mode='build'] .bottom-bar,
-.app-shell[data-mode='import'] .bottom-bar {
-  grid-template-columns: 1fr 1.2fr;
 }
 
 @media (max-width: 1100px) {
@@ -217,10 +207,6 @@ button:hover {
 
   #viewer {
     min-height: 56vh;
-  }
-
-  .bottom-bar {
-    grid-template-columns: 1fr;
   }
 
   body {

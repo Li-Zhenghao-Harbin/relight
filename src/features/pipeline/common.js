@@ -1,10 +1,15 @@
 import * as THREE from 'three';
 
-export async function loadTextureFromInput(state, inputId) {
+function getFileFromInput(inputId) {
   const input = document.getElementById(inputId);
-  if (!input.files || input.files.length === 0) return null;
+  if (!input?.files || input.files.length === 0) return null;
+  return input.files[0];
+}
 
-  const file = input.files[0];
+export async function loadTextureFromInput(state, inputId) {
+  const file = getFileFromInput(inputId) || state.autoTextureFiles?.[inputId] || null;
+  if (!file) return null;
+
   const objectUrl = URL.createObjectURL(file);
   state.objectUrls.push(objectUrl);
 

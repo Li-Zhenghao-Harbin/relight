@@ -200,6 +200,31 @@ button:hover {
   color: #ff9b9b;
 }
 
+.mapping-hint {
+  margin: 8px 0 6px;
+  font-size: 12px;
+  color: #9cb0ca;
+}
+
+.mapping-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #9cb0ca;
+}
+
+.mapping-list li {
+  margin: 4px 0;
+}
+
+.mapping-list .mapped {
+  color: #8fc6a1;
+}
+
+.mapping-list .missing {
+  color: #ffb7b7;
+}
+
 .viewer-wrap {
   position: relative;
   min-height: 0;

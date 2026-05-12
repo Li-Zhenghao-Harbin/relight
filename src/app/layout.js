@@ -20,12 +20,16 @@ export function createAppLayout() {
 
       <section class="group" data-mode-only="build">
         <h2>贴图输入</h2>
+        <button id="pickTextureFolderBtn" type="button">选择贴图文件夹并自动映射</button>
+        <input id="textureFolderInput" type="file" webkitdirectory directory multiple hidden />
         <label>基础图 / Albedo <input id="baseMap" type="file" accept="image/*" /></label>
         <label>Normal <input id="normalMap" type="file" accept="image/*" /></label>
         <label>Roughness <input id="roughnessMap" type="file" accept="image/*" /></label>
         <label>F0 <input id="f0Map" type="file" accept="image/*" /></label>
         <label>Alpha <input id="alphaMap" type="file" accept="image/*" /></label>
         <label>Depth <input id="depthMap" type="file" accept="image/*" /></label>
+        <p id="textureMappingHint" class="mapping-hint">当前未绑定自动映射文件。</p>
+        <ul id="textureMappingList" class="mapping-list"></ul>
       </section>
 
       <section class="group" data-mode-only="build">

@@ -24,7 +24,14 @@ const modelPipeline = createModelPipeline({
 
 const { bindNumberDisplay, setUiMode } = uiController;
 const { updateMainLightPosition, updateRendererSize, renderFrame } = sceneController;
-const { applyMaps, importModelForLighting, exportGlb, updateShadowSettings } = modelPipeline;
+const {
+  applyMaps,
+  importModelForLighting,
+  exportGlb,
+  updateShadowSettings,
+  importTextureFolder,
+  refreshTextureMappingPreview
+} = modelPipeline;
 
 initializeBindings({
   setUiMode,
@@ -32,10 +39,13 @@ initializeBindings({
   applyMaps,
   exportGlb,
   importModelForLighting,
+  importTextureFolder,
+  refreshTextureMappingPreview,
   updateMainLightPosition,
   updateShadowSettings
 });
 
+refreshTextureMappingPreview();
 updateMainLightPosition();
 updateShadowSettings();
 setUiMode(DEFAULT_MODE);

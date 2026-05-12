@@ -12,6 +12,25 @@ function bindActionEvents({ applyMaps, exportGlb, importModelForLighting }) {
   document.getElementById('importBtn').addEventListener('click', importModelForLighting);
 }
 
+function bindFolderImportEvents({ importTextureFolder }) {
+  const triggerBtn = document.getElementById('pickTextureFolderBtn');
+  const folderInput = document.getElementById('textureFolderInput');
+  if (!triggerBtn || !folderInput || !importTextureFolder) return;
+
+  triggerBtn.addEventListener('click', () => folderInput.click());
+  folderInput.addEventListener('change', () => {
+    importTextureFolder(Array.from(folderInput.files || []));
+  });
+}
+
+function bindTextureInputEvents({ refreshTextureMappingPreview }) {
+  if (!refreshTextureMappingPreview) return;
+  const ids = ['baseMap', 'normalMap', 'roughnessMap', 'f0Map', 'alphaMap', 'depthMap'];
+  ids.forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => refreshTextureMappingPreview());
+  });
+}
+
 function bindValueDisplays({ bindNumberDisplay }) {
   bindNumberDisplay('segments', 'segmentsValue');
   bindNumberDisplay('displacementScale', 'displacementScaleValue', (v) => v.toFixed(3));
@@ -46,11 +65,15 @@ export function initializeBindings({
   applyMaps,
   exportGlb,
   importModelForLighting,
+  importTextureFolder,
+  refreshTextureMappingPreview,
   updateMainLightPosition,
   updateShadowSettings
 }) {
   bindModeEvents({ setUiMode });
   bindActionEvents({ applyMaps, exportGlb, importModelForLighting });
+  bindFolderImportEvents({ importTextureFolder });
+  bindTextureInputEvents({ refreshTextureMappingPreview });
   bindValueDisplays({ bindNumberDisplay });
   bindLightingEvents({ updateMainLightPosition, updateShadowSettings });
 }

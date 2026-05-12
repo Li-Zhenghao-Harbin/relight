@@ -1,6 +1,7 @@
 export function createAppState() {
   return {
     uiMode: 'build',
+    autoTextureFiles: {},
     textures: {},
     objectUrls: [],
     mesh: null,

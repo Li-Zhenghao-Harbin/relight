@@ -32,6 +32,24 @@ body,
   overflow: hidden;
 }
 
+.mode-nav {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #243243;
+  background: #111a24;
+}
+
+.mode-tab {
+  min-width: 120px;
+  padding: 8px 12px;
+}
+
+.mode-tab.is-active {
+  background: #2a4f83;
+  border-color: #5f8fd3;
+}
+
 .top-layout {
   display: grid;
   grid-template-columns: 340px 1fr 340px;
@@ -174,6 +192,16 @@ button:hover {
 
 .bottom-group {
   margin: 0;
+}
+
+.app-shell[data-mode='build'] [data-mode-only='import'],
+.app-shell[data-mode='import'] [data-mode-only='build'] {
+  display: none;
+}
+
+.app-shell[data-mode='build'] .bottom-bar,
+.app-shell[data-mode='import'] .bottom-bar {
+  grid-template-columns: 1fr 1.2fr;
 }
 
 @media (max-width: 1100px) {

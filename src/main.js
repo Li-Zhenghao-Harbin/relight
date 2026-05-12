@@ -6,11 +6,16 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 document.querySelector('#app').innerHTML = `
   <div class="app-shell">
+    <nav class="mode-nav">
+      <button id="modeBuildBtn" class="mode-tab is-active" type="button">生成 / 导出</button>
+      <button id="modeImportBtn" class="mode-tab" type="button">导入 / 打光</button>
+    </nav>
+
     <div class="top-layout">
       <aside class="panel panel-left">
       <h1>贴图打光</h1>
 
-      <section class="group">
+      <section class="group" data-mode-only="build">
         <h2>贴图输入</h2>
         <label>基础图 / Albedo <input id="baseMap" type="file" accept="image/*" /></label>
         <label>Normal <input id="normalMap" type="file" accept="image/*" /></label>
@@ -20,7 +25,7 @@ document.querySelector('#app').innerHTML = `
         <label>Depth <input id="depthMap" type="file" accept="image/*" /></label>
       </section>
 
-      <section class="group">
+      <section class="group" data-mode-only="build">
         <h2>材质和几何参数</h2>
         <label>细分段数
           <input id="segments" type="range" min="32" max="512" step="32" value="256" />
@@ -48,7 +53,7 @@ document.querySelector('#app').innerHTML = `
         </label>
       </section>
 
-      <section class="group">
+      <section class="group" data-mode-only="build">
         <h2>GLB 导出模式</h2>
         <label>导出类型
           <select id="exportMode">
@@ -58,8 +63,13 @@ document.querySelector('#app').innerHTML = `
         </label>
       </section>
 
-      <section class="group">
+      <section class="group" data-mode-only="build">
         <button id="applyBtn">应用贴图并预览</button>
+      </section>
+
+      <section class="group" data-mode-only="import">
+        <h2>导入模式说明</h2>
+        <p class="desc">当前模式用于加载已有 GLB/GLTF，并在右侧参数中实时调光和阴影。</p>
       </section>
     </aside>
 
@@ -119,7 +129,7 @@ document.querySelector('#app').innerHTML = `
     </div>
 
     <footer class="bottom-bar">
-      <section class="group bottom-group">
+      <section class="group bottom-group" data-mode-only="import">
         <h2>导入模型到打光场景</h2>
         <label>GLB / GLTF
           <input id="importModel" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
@@ -127,7 +137,7 @@ document.querySelector('#app').innerHTML = `
         <button id="importBtn">导入模型并打光</button>
       </section>
 
-      <section class="group bottom-group">
+      <section class="group bottom-group" data-mode-only="build">
         <h2>导出</h2>
         <button id="exportBtn">导出 GLB</button>
       </section>
@@ -138,6 +148,7 @@ document.querySelector('#app').innerHTML = `
 `;
 
 const state = {
+  uiMode: 'build',
   textures: {},
   objectUrls: [],
   mesh: null,
@@ -192,6 +203,17 @@ scene.add(rimLight);
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle('error', isError);
+}
+
+function setUiMode(mode) {
+  if (mode !== 'build' && mode !== 'import') return;
+  state.uiMode = mode;
+
+  const appShell = document.querySelector('.app-shell');
+  appShell?.setAttribute('data-mode', mode);
+
+  document.getElementById('modeBuildBtn')?.classList.toggle('is-active', mode === 'build');
+  document.getElementById('modeImportBtn')?.classList.toggle('is-active', mode === 'import');
 }
 
 function updateRendererSize() {
@@ -666,6 +688,8 @@ function exportGlb() {
 document.getElementById('applyBtn').addEventListener('click', applyMaps);
 document.getElementById('exportBtn').addEventListener('click', exportGlb);
 document.getElementById('importBtn').addEventListener('click', importModelForLighting);
+document.getElementById('modeBuildBtn').addEventListener('click', () => setUiMode('build'));
+document.getElementById('modeImportBtn').addEventListener('click', () => setUiMode('import'));
 
 bindNumberDisplay('segments', 'segmentsValue');
 bindNumberDisplay('displacementScale', 'displacementScaleValue', (v) => v.toFixed(3));
@@ -700,6 +724,7 @@ document.getElementById('shadowBias').addEventListener('input', updateShadowSett
 document.getElementById('shadowNormalBias').addEventListener('input', updateShadowSettings);
 updateMainLightPosition();
 updateShadowSettings();
+setUiMode('build');
 
 window.addEventListener('resize', updateRendererSize);
 updateRendererSize();

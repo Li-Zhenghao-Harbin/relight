@@ -20,7 +20,8 @@
    - 适合依赖材质位移解释的渲染链路
 
 2. `baked`（立体几何）
-   - 将 depth 烘焙到顶点，导出真实起伏网格
+   - 先做 Camera Space Reconstruction（Depth -> Point Cloud）
+   - 再将 depth 烘焙到顶点，导出真实起伏网格
    - 适合大多数平台直接导入后打光，阴影结果更稳定
 
 ---
@@ -69,7 +70,26 @@
 - `flat`：直接导出当前网格与材质
 - `baked`：执行 depth 烘焙流程
 
-### 3.3 depth 烘焙为真实几何（关键）
+### 3.3 Camera Space Reconstruction（新增预处理步骤）
+
+主流程在：`src/features/pipeline/exporter.js`
+
+在 `baked` 导出前，先把 depth 从图像空间恢复到 camera space 点云：
+
+1. 读取 depth 贴图像素（`getTextureImageData`）
+2. 基于相机 FOV 与图像尺寸构建简化内参：
+   - `fx = fy = (H/2) / tan(FOV/2)`
+   - `cx = (W - 1) / 2`, `cy = (H - 1) / 2`
+3. 把 depth 映射为相机深度 `z`
+4. 用针孔模型恢复 3D 点：
+   - `x_cam = (u - cx) * z / fx`
+   - `y_cam = -(v - cy) * z / fy`
+   - `z_cam = -z`
+5. 得到 point cloud（`Float32Array`），并保存到运行时状态中供后续步骤使用
+
+当前代码包含自适应采样步长（`stride`），用于控制点云规模并保持导出速度。
+
+### 3.4 depth 烘焙为真实几何（关键）
 
 当 `exportMode = baked` 时：
 
@@ -119,6 +139,27 @@
 - mesh 的 `castShadow` / `receiveShadow`
 
 这样可确保“UI 参数变更 -> 渲染器/光源/模型状态”同步更新，避免阴影表现不一致。
+
+### 5.3 步骤级输出（新增）
+
+页面左侧新增“步骤输出”区域（`#stepLog`），每个技术步骤都会即时写入：
+
+- `xxx已完成`
+- `xxx失败：<原因>`
+
+相关实现：
+
+- `src/core/ui.js`
+  - `reportStep(stepName, success, detail)`
+  - `clearStepLog()`
+- `src/features/pipeline/exporter.js`
+  - 在导出流程中依次输出：
+    - 导出流程初始化
+    - 导出模式识别
+    - Camera space reconstruction
+    - 导出网格构建
+    - GLB 二进制生成
+    - 文件下载
 
 ---
 

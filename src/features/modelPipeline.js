@@ -4,7 +4,7 @@ import { createModelImporter } from './pipeline/importer.js';
 
 export function createModelPipeline({ state, sceneController, uiController }) {
   const { scene, renderer, keyLight, fitCameraToObject } = sceneController;
-  const { setStatus } = uiController;
+  const { setStatus, reportStep, clearStepLog } = uiController;
 
   function disposeTexture(texture) {
     if (texture) texture.dispose();
@@ -117,7 +117,10 @@ export function createModelPipeline({ state, sceneController, uiController }) {
 
   const exportGlb = createModelExporter({
     state,
-    setStatus
+    setStatus,
+    reportStep,
+    clearStepLog,
+    getCameraFov: () => sceneController.camera.fov
   });
 
   return {

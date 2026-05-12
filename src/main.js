@@ -13,7 +13,8 @@ const state = createAppState();
 const sceneController = createSceneController({ viewer: document.getElementById('viewer') });
 const uiController = createUiController({
   state,
-  statusEl: document.getElementById('status')
+  statusEl: document.getElementById('status'),
+  stepLogEl: document.getElementById('stepLog')
 });
 const modelPipeline = createModelPipeline({
   state,

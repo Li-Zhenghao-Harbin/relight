@@ -1,6 +1,6 @@
 import { MODE_CONFIG } from '../app/modeConfig.js';
 
-export function createUiController({ state, statusEl }) {
+export function createUiController({ state, statusEl, stepLogEl }) {
   const modeConfigMap = new Map(MODE_CONFIG.map((mode) => [mode.key, mode]));
 
   function setStatus(text, isError = false) {
@@ -34,9 +34,27 @@ export function createUiController({ state, statusEl }) {
     update();
   }
 
+  function clearStepLog() {
+    if (stepLogEl) stepLogEl.innerHTML = '';
+  }
+
+  function reportStep(stepName, success, detail = '') {
+    if (!stepLogEl) return;
+    const item = document.createElement('li');
+    const statusText = success ? '已完成' : '失败';
+    item.className = success ? 'ok' : 'fail';
+    item.textContent = detail
+      ? `${stepName}${statusText}：${detail}`
+      : `${stepName}${statusText}`;
+    stepLogEl.appendChild(item);
+    stepLogEl.scrollTop = stepLogEl.scrollHeight;
+  }
+
   return {
     setStatus,
     setUiMode,
-    bindNumberDisplay
+    bindNumberDisplay,
+    clearStepLog,
+    reportStep
   };
 }

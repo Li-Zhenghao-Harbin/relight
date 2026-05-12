@@ -89,6 +89,10 @@ export function createAppLayout() {
       </section>
 
       <p id="status" class="status status-panel">等待上传贴图...</p>
+      <section class="group step-group">
+        <h2>步骤输出</h2>
+        <ul id="stepLog" class="step-log"></ul>
+      </section>
     </aside>
 
       <main class="viewer-wrap">

@@ -467,21 +467,48 @@ async function importModelForLighting() {
     }
 
     const loader = new GLTFLoader();
-    const objectUrl = URL.createObjectURL(file);
-    const gltf = await new Promise((resolve, reject) => {
-      loader.load(
-        objectUrl,
-        (result) => {
-          URL.revokeObjectURL(objectUrl);
-          resolve(result);
-        },
-        undefined,
-        (error) => {
-          URL.revokeObjectURL(objectUrl);
-          reject(error);
-        }
-      );
-    });
+    let gltf;
+    if (fileName.endsWith('.glb')) {
+      const arrayBuffer = await file.arrayBuffer();
+      try {
+        gltf = await new Promise((resolve, reject) => {
+          loader.parse(arrayBuffer, '', resolve, reject);
+        });
+      } catch (parseError) {
+        // 少数浏览器/文件会在 parse 路径失败，回退到 objectURL 再试一次。
+        const objectUrl = URL.createObjectURL(file);
+        gltf = await new Promise((resolve, reject) => {
+          loader.load(
+            objectUrl,
+            (result) => {
+              URL.revokeObjectURL(objectUrl);
+              resolve(result);
+            },
+            undefined,
+            (error) => {
+              URL.revokeObjectURL(objectUrl);
+              reject(parseError || error);
+            }
+          );
+        });
+      }
+    } else {
+      const objectUrl = URL.createObjectURL(file);
+      gltf = await new Promise((resolve, reject) => {
+        loader.load(
+          objectUrl,
+          (result) => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(result);
+          },
+          undefined,
+          (error) => {
+            URL.revokeObjectURL(objectUrl);
+            reject(error);
+          }
+        );
+      });
+    }
 
     const root = gltf.scene || gltf.scenes?.[0];
     if (!root) {
@@ -505,6 +532,10 @@ async function importModelForLighting() {
     const message = `${error?.message || '未知错误'}`;
     if (message.includes('Invalid typed array length')) {
       setStatus('模型导入失败：文件可能已损坏，或该 GLTF 依赖外部 .bin/.贴图但未一起提供。建议优先使用内嵌资源的 .glb。', true);
+      return;
+    }
+    if (message.includes('could not be read') || message.includes('permission')) {
+      setStatus('模型导入失败：浏览器无法读取该文件。请将文件复制到本地普通目录（如桌面）后重试，或重新导出一个新的 .glb。', true);
       return;
     }
     setStatus(`模型导入失败：${message}`, true);

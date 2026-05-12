@@ -1,0 +1,162 @@
+# 2D 人脸打光技术实现流程
+
+本文档聚焦项目的核心目标：  
+**把一张 2D 人脸图片转成可被 three.js 多方向光源打光的资产，并在光源移动时产生合理阴影。**
+
+---
+
+## 1. 问题定义与技术路线
+
+### 1.1 核心问题
+
+单纯的 2D 图片（只有颜色）在 three.js 中被光照时，没有真实几何起伏，阴影变化非常有限，无法体现鼻梁/眼窝等结构。
+
+### 1.2 解决路线
+
+项目采用“两种资产路径”来适配不同平台能力：
+
+1. `flat`（平面语义）
+   - 保留位移贴图语义，模型几何仍是平面
+   - 适合依赖材质位移解释的渲染链路
+
+2. `baked`（立体几何）
+   - 将 depth 烘焙到顶点，导出真实起伏网格
+   - 适合大多数平台直接导入后打光，阴影结果更稳定
+
+---
+
+## 2. 运行时总体流程
+
+### 步骤 A：初始化应用（入口装配）
+
+由 `src/main.js` 完成：
+
+1. 注入页面结构：`createAppLayout()`
+2. 初始化状态：`createAppState()`
+3. 初始化 three 场景：`createSceneController()`
+4. 初始化 UI 控制器：`createUiController()`
+5. 初始化业务管线：`createModelPipeline()`
+6. 绑定所有交互事件：`initializeBindings()`
+7. 设置默认模式、默认光照参数并启动渲染循环
+
+### 步骤 B：进入模式执行业务
+
+- `build` 模式：上传贴图 -> 预览 -> 导出 GLB
+- `import` 模式：导入 GLB/GLTF -> 调整光照与阴影
+
+模式由 `state.uiMode` 驱动，UI 显示由 `data-mode-only` 控制。
+
+---
+
+## 3. 生成/导出模式（build）技术流程
+
+### 3.1 贴图加载与材质构建
+
+主流程在：`src/features/pipeline/applier.js`
+
+1. 读取输入贴图（albedo / normal / roughness / f0 / alpha / depth）
+2. 设置颜色空间（albedo 为 sRGB，其余为线性）
+3. 按图片宽高比创建平面几何
+4. 构建 `MeshStandardMaterial`，挂接各类贴图
+5. 预览网格加入场景，并应用阴影标记
+
+### 3.2 导出 GLB
+
+主流程在：`src/features/pipeline/exporter.js`
+
+导出前读取 `exportMode`：
+
+- `flat`：直接导出当前网格与材质
+- `baked`：执行 depth 烘焙流程
+
+### 3.3 depth 烘焙为真实几何（关键）
+
+当 `exportMode = baked` 时：
+
+1. 克隆预览网格
+2. 从 displacement 贴图读取像素数据
+3. 对每个顶点按 UV 采样 depth
+4. 计算 `Z = depth * displacementScale + displacementBias`
+5. 写回顶点坐标，重算法线
+6. 移除位移贴图参数，避免下游重复解释
+7. 通过 `GLTFExporter` 导出二进制 GLB
+
+这个步骤是“阴影能否正确随光位变化”的关键。
+
+---
+
+## 4. 导入/打光模式（import）技术流程
+
+主流程在：`src/features/pipeline/importer.js`
+
+1. 校验文件类型（`.glb/.gltf`）
+2. 若是 `.glb`，先做文件头校验（`glTF` magic）
+3. 优先 `arrayBuffer + loader.parse`，失败回退 `objectURL + loader.load`
+4. 导入场景根节点并加入当前 three 场景
+5. 应用 cast/receive shadow 标记
+6. 自动相机聚焦，进入可交互打光状态
+
+---
+
+## 5. 多方向打光与阴影计算链路
+
+### 5.1 光照基础设施
+
+在 `src/core/scene.js` 中初始化：
+
+- `DirectionalLight`（主光）
+- `AmbientLight`（环境补光）
+- `renderer.shadowMap.enabled = true`
+
+### 5.2 阴影参数统一更新
+
+在 `src/features/modelPipeline.js` 的 `updateShadowSettings()` 中统一处理：
+
+- 阴影开关
+- 光源强度
+- shadow map 分辨率
+- `bias` / `normalBias`
+- mesh 的 `castShadow` / `receiveShadow`
+
+这样可确保“UI 参数变更 -> 渲染器/光源/模型状态”同步更新，避免阴影表现不一致。
+
+---
+
+## 6. 为什么 GLB 是必要中间产物
+
+本项目构建 GLB 的目的不是“仅为文件格式转换”，而是为了把 2D 贴图信息组织成可被 3D 引擎稳定消费的资产：
+
+- 统一材质与纹理绑定关系
+- 在需要时把 depth 固化成真实几何
+- 让外部平台在移动光源时得到更接近真实人脸结构的阴影变化
+
+简而言之：  
+**GLB 是把 2D 信息转化为“可打光三维语义”的载体。**
+
+---
+
+## 7. 代码模块与职责对照
+
+- `src/main.js`：应用装配与启动
+- `src/app/layout.js`：页面结构
+- `src/app/modeConfig.js`：模式定义（单一配置源）
+- `src/app/bindings.js`：交互绑定
+- `src/core/state.js`：运行时状态
+- `src/core/ui.js`：模式切换与状态提示
+- `src/core/scene.js`：three 场景与渲染基础设施
+- `src/features/modelPipeline.js`：业务编排 + 阴影统一控制
+- `src/features/pipeline/applier.js`：贴图应用
+- `src/features/pipeline/exporter.js`：导出与 depth 烘焙
+- `src/features/pipeline/importer.js`：导入与容错
+- `src/features/pipeline/common.js`：共享工具函数
+
+---
+
+## 8. 结果判定标准（是否达成目标）
+
+满足以下条件可认为技术目标达成：
+
+1. 仅上传 albedo 时，打光变化有限（符合预期）
+2. 上传 depth + 导出 `baked` GLB 后，鼻梁/眼窝阴影随光位变化明显增强
+3. 在导入模式中移动光源 XYZ，阴影连续变化且无严重伪影
+4. 调整 bias/normalBias 后可控制阴影条纹与悬浮问题

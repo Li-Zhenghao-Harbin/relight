@@ -1,4 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { forceNormalMapAsShadingNormal } from './common.js';
 
 export function createModelImporter({
   state,
@@ -86,7 +87,13 @@ export function createModelImporter({
       }
 
       root.traverse((node) => {
-        if (node.isMesh) node.frustumCulled = false;
+        if (!node.isMesh) return;
+        node.frustumCulled = false;
+        if (Array.isArray(node.material)) {
+          node.material.forEach((mat) => forceNormalMapAsShadingNormal(mat));
+        } else {
+          forceNormalMapAsShadingNormal(node.material);
+        }
       });
 
       state.importedRoot = root;

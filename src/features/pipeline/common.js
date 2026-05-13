@@ -57,3 +57,36 @@ export function sampleDepthFromImageData(imageData, u, v) {
   const idx = (y * imageData.width + x) * 4;
   return imageData.data[idx] / 255;
 }
+
+export function forceNormalMapAsShadingNormal(material) {
+  if (!material || typeof material !== 'object') return;
+  if (!('normalMap' in material) || typeof material.onBeforeCompile !== 'function') return;
+
+  const previousOnBeforeCompile = material.onBeforeCompile;
+  const previousCacheKey = material.customProgramCacheKey?.bind(material);
+  const shaderPatchTag = 'ai-normal-shading-override-v1';
+
+  material.onBeforeCompile = (shader) => {
+    previousOnBeforeCompile?.(shader);
+    if (!shader?.fragmentShader?.includes('#include <normal_fragment_maps>')) return;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <normal_fragment_maps>',
+      `
+#ifdef USE_NORMALMAP
+  vec3 aiNormalTexel = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
+  aiNormalTexel.xy *= normalScale;
+  vec3 aiNormalView = normalize( normalMatrix * aiNormalTexel );
+  normal = normalize( faceDirection * aiNormalView);
+#endif
+`
+    );
+  };
+
+  material.customProgramCacheKey = () => {
+    const baseKey = previousCacheKey ? previousCacheKey() : '';
+    const hasNormalMap = material.normalMap ? '1' : '0';
+    return `${baseKey}|${shaderPatchTag}|normalMap=${hasNormalMap}`;
+  };
+
+  material.needsUpdate = true;
+}

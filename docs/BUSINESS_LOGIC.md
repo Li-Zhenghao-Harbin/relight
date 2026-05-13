@@ -117,6 +117,12 @@
 - bias 与 normalBias
 - 模型 cast/receive shadow 标记
 
+Shading Normal 规则：
+
+- 运行时打光不再把 mesh normal 作为最终 shading normal。
+- 若材质存在 normal map，则使用 AI normal map 采样结果作为最终 shading normal（shader override）。
+- 该策略同时作用于“生成预览材质”和“导入模型材质”。
+
 ## 6. 后续扩展建议
 
 未来新增模式时，建议遵循以下规则：

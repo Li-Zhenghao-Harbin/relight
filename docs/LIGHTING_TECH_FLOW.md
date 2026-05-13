@@ -163,7 +163,17 @@ Depth refinement 参数也在 UI 中可调：`depthRefineEnabled`、`depthHoleFi
 
 这样可确保“UI 参数变更 -> 渲染器/光源/模型状态”同步更新，避免阴影表现不一致。
 
-### 5.3 步骤级输出（新增）
+### 5.3 Shading Normal 替换（AI Normal 优先）
+
+在预览材质和导入材质中，片元着色阶段会执行 normal override：
+
+- 不使用 mesh normal 作为最终 shading normal
+- 直接以 AI normal map 采样结果作为 `normal`（转换到 view space）
+- 该逻辑在 `src/features/pipeline/common.js` 的 `forceNormalMapAsShadingNormal()` 中统一实现
+
+这样可以让光照结果主要由 AI normal map 驱动，减少几何法线对人脸细节光影的干扰。
+
+### 5.4 步骤级输出（新增）
 
 页面左侧新增“步骤输出”区域（`#stepLog`），每个技术步骤都会即时写入：
 

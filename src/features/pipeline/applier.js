@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getAspectSize, loadTextureFromInput } from './common.js';
+import { forceNormalMapAsShadingNormal, getAspectSize, loadTextureFromInput } from './common.js';
 
 export function createMapsApplier({ state, scene, setStatus, applyModelShadowFlags, cleanupBeforeApply }) {
   return async function applyMaps() {
@@ -56,6 +56,7 @@ export function createMapsApplier({ state, scene, setStatus, applyModelShadowFla
         transparent: Boolean(alphaTex),
         alphaTest: alphaTex ? 0.08 : 0
       });
+      forceNormalMapAsShadingNormal(state.material);
 
       state.mesh = new THREE.Mesh(state.geometry, state.material);
       state.material.shadowSide = THREE.FrontSide;

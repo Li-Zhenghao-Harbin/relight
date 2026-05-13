@@ -9,39 +9,81 @@ export function createModelPipeline({ state, sceneController, uiController }) {
     {
       inputId: 'baseMap',
       label: 'Albedo/BaseColor',
-      prefixes: ['basecolor_', 'albedo_', 'base_color_', 'diffuse_']
+      ruleInputId: 'ruleBaseMap',
+      defaultPrefixes: ['basecolor_', 'albedo_', 'base_color_', 'diffuse_']
     },
-    { inputId: 'normalMap', label: 'Normal', prefixes: ['normal_'] },
-    { inputId: 'roughnessMap', label: 'Roughness', prefixes: ['roughness_'] },
-    { inputId: 'f0Map', label: 'F0/Specular', prefixes: ['f0_', 'specular_', 'metallic_'] },
-    { inputId: 'alphaMap', label: 'Alpha', prefixes: ['alpha_', 'opacity_'] },
-    { inputId: 'depthMap', label: 'Depth', prefixes: ['depth_', 'displacement_'] }
+    {
+      inputId: 'normalMap',
+      label: 'Normal',
+      ruleInputId: 'ruleNormalMap',
+      defaultPrefixes: ['normal_']
+    },
+    {
+      inputId: 'roughnessMap',
+      label: 'Roughness',
+      ruleInputId: 'ruleRoughnessMap',
+      defaultPrefixes: ['roughness_']
+    },
+    {
+      inputId: 'f0Map',
+      label: 'F0/Specular',
+      ruleInputId: 'ruleF0Map',
+      defaultPrefixes: ['f0_', 'specular_', 'metallic_']
+    },
+    {
+      inputId: 'alphaMap',
+      label: 'Alpha',
+      ruleInputId: 'ruleAlphaMap',
+      defaultPrefixes: ['alpha_', 'opacity_']
+    },
+    {
+      inputId: 'depthMap',
+      label: 'Depth',
+      ruleInputId: 'ruleDepthMap',
+      defaultPrefixes: ['depth_', 'displacement_']
+    }
   ];
+
+  function getPrefixesFromRule(rule) {
+    const raw = document.getElementById(rule.ruleInputId)?.value || '';
+    const parsed = raw
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    return parsed.length > 0 ? parsed : rule.defaultPrefixes;
+  }
+
+  function assignFileToInput(inputId, file) {
+    if (!file) return;
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    try {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      input.files = dataTransfer.files;
+    } catch {
+      // 某些浏览器不允许脚本设置 input.files，保留自动映射的回退逻辑。
+    }
+  }
 
   function resolveTextureFile(inputId) {
     const manualFile = document.getElementById(inputId)?.files?.[0];
     return manualFile || state.autoTextureFiles?.[inputId] || null;
   }
 
-  function refreshTextureMappingPreview(unmatched = []) {
+  function refreshTextureMappingPreview() {
     const listEl = document.getElementById('textureMappingList');
-    const hintEl = document.getElementById('textureMappingHint');
-    if (!listEl || !hintEl) return;
+    if (!listEl) return;
 
-    const lines = mappingRules.map((rule) => {
-      const file = resolveTextureFile(rule.inputId);
-      const cls = file ? 'mapped' : 'missing';
-      const text = file ? `${rule.label} -> ${file.name}` : `${rule.label} -> 未匹配`;
-      return `<li class="${cls}">${text}</li>`;
-    });
-
-    if (unmatched.length > 0) {
-      lines.push(`<li class="missing">未匹配文件：${unmatched.join(', ')}</li>`);
-    }
+    const lines = mappingRules
+      .map((rule) => {
+        const file = resolveTextureFile(rule.inputId);
+        if (!file) return null;
+        return `<li class="mapped">${rule.label}：${file.name}</li>`;
+      })
+      .filter(Boolean);
 
     listEl.innerHTML = lines.join('');
-    const mappedCount = mappingRules.filter((rule) => resolveTextureFile(rule.inputId)).length;
-    hintEl.textContent = `当前已绑定 ${mappedCount}/6 个贴图槽位。`;
   }
 
   function disposeTexture(texture) {
@@ -135,21 +177,22 @@ export function createModelPipeline({ state, sceneController, uiController }) {
     }
 
     const selected = {};
-    const unmatched = [];
     for (const file of files) {
       const normalized = file.name.toLowerCase();
-      let matched = false;
       for (const rule of mappingRules) {
         if (selected[rule.inputId]) continue;
-        if (rule.prefixes.some((prefix) => normalized.startsWith(prefix))) {
+        const prefixes = getPrefixesFromRule(rule);
+        if (prefixes.some((prefix) => normalized.startsWith(prefix))) {
           selected[rule.inputId] = file;
-          matched = true;
+          break;
         }
       }
-      if (!matched) unmatched.push(file.name);
     }
 
     state.autoTextureFiles = selected;
+    mappingRules.forEach((rule) => {
+      assignFileToInput(rule.inputId, selected[rule.inputId]);
+    });
     const mappedCount = Object.keys(selected).length;
     const detail = mappingRules
       .filter((rule) => selected[rule.inputId])
@@ -157,13 +200,13 @@ export function createModelPipeline({ state, sceneController, uiController }) {
       .join(' | ');
 
     if (mappedCount === 0) {
-      refreshTextureMappingPreview(unmatched);
-      reportStep?.('文件夹自动映射', false, '未匹配到规则文件');
+      refreshTextureMappingPreview();
+      reportStep?.('文件夹自动映射', false, '未找到符合规则的贴图文件');
       setStatus('自动映射失败：未找到符合命名规则的贴图文件。', true);
       return;
     }
 
-    refreshTextureMappingPreview(unmatched);
+    refreshTextureMappingPreview();
     reportStep?.('文件夹自动映射', true, `匹配 ${mappedCount} 项`);
     setStatus(`自动映射完成（${mappedCount}/6）：${detail}`);
   }

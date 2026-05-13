@@ -20,7 +20,10 @@ export function createAppLayout() {
 
       <section class="group" data-mode-only="build">
         <h2>贴图输入</h2>
-        <button id="pickTextureFolderBtn" type="button">选择贴图文件夹并自动映射</button>
+        <div class="folder-actions">
+          <button id="pickTextureFolderBtn" type="button">选择贴图文件夹并自动映射</button>
+          <button id="openRuleDialogBtn" type="button">匹配规则</button>
+        </div>
         <input id="textureFolderInput" type="file" webkitdirectory directory multiple hidden />
         <label>基础图 / Albedo <input id="baseMap" type="file" accept="image/*" /></label>
         <label>Normal <input id="normalMap" type="file" accept="image/*" /></label>
@@ -28,7 +31,6 @@ export function createAppLayout() {
         <label>F0 <input id="f0Map" type="file" accept="image/*" /></label>
         <label>Alpha <input id="alphaMap" type="file" accept="image/*" /></label>
         <label>Depth <input id="depthMap" type="file" accept="image/*" /></label>
-        <p id="textureMappingHint" class="mapping-hint">当前未绑定自动映射文件。</p>
         <ul id="textureMappingList" class="mapping-list"></ul>
       </section>
 
@@ -152,6 +154,35 @@ export function createAppLayout() {
           </label>
         </section>
       </aside>
+    </div>
+
+    <div id="ruleDialog" class="rule-dialog" hidden aria-hidden="true">
+      <div class="rule-dialog-backdrop" id="ruleDialogBackdrop"></div>
+      <div class="rule-dialog-panel" role="dialog" aria-labelledby="ruleDialogTitle">
+        <h2 id="ruleDialogTitle">文件夹命名匹配规则</h2>
+        <p class="rule-dialog-desc">多个前缀用英文逗号分隔，匹配时忽略大小写。</p>
+        <label>BaseColor / Albedo
+          <input id="ruleBaseMap" type="text" value="BaseColor_,Albedo_,Base_Color_,Diffuse_" />
+        </label>
+        <label>Normal
+          <input id="ruleNormalMap" type="text" value="Normal_" />
+        </label>
+        <label>Roughness
+          <input id="ruleRoughnessMap" type="text" value="Roughness_" />
+        </label>
+        <label>F0
+          <input id="ruleF0Map" type="text" value="F0_,Specular_,Metallic_" />
+        </label>
+        <label>Alpha
+          <input id="ruleAlphaMap" type="text" value="Alpha_,Opacity_" />
+        </label>
+        <label>Depth
+          <input id="ruleDepthMap" type="text" value="Depth_,Displacement_" />
+        </label>
+        <div class="rule-dialog-actions">
+          <button id="ruleDialogCloseBtn" type="button">关闭</button>
+        </div>
+      </div>
     </div>
   </div>
 `;

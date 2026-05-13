@@ -23,6 +23,43 @@ function bindFolderImportEvents({ importTextureFolder }) {
   });
 }
 
+function bindRuleDialogEvents({ refreshTextureMappingPreview }) {
+  const dialog = document.getElementById('ruleDialog');
+  const openBtn = document.getElementById('openRuleDialogBtn');
+  const closeBtn = document.getElementById('ruleDialogCloseBtn');
+  const backdrop = document.getElementById('ruleDialogBackdrop');
+  if (!dialog || !openBtn || !closeBtn || !backdrop) return;
+
+  const ruleInputIds = ['ruleBaseMap', 'ruleNormalMap', 'ruleRoughnessMap', 'ruleF0Map', 'ruleAlphaMap', 'ruleDepthMap'];
+
+  function openDialog() {
+    dialog.hidden = false;
+    dialog.setAttribute('aria-hidden', 'false');
+    closeBtn.focus();
+  }
+
+  function closeDialog() {
+    dialog.hidden = true;
+    dialog.setAttribute('aria-hidden', 'true');
+    openBtn.focus();
+  }
+
+  openBtn.addEventListener('click', openDialog);
+  closeBtn.addEventListener('click', closeDialog);
+  backdrop.addEventListener('click', closeDialog);
+
+  ruleInputIds.forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', () => refreshTextureMappingPreview?.());
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !dialog.hidden) {
+      e.preventDefault();
+      closeDialog();
+    }
+  });
+}
+
 function bindTextureInputEvents({ refreshTextureMappingPreview }) {
   if (!refreshTextureMappingPreview) return;
   const ids = ['baseMap', 'normalMap', 'roughnessMap', 'f0Map', 'alphaMap', 'depthMap'];
@@ -73,6 +110,7 @@ export function initializeBindings({
   bindModeEvents({ setUiMode });
   bindActionEvents({ applyMaps, exportGlb, importModelForLighting });
   bindFolderImportEvents({ importTextureFolder });
+  bindRuleDialogEvents({ refreshTextureMappingPreview });
   bindTextureInputEvents({ refreshTextureMappingPreview });
   bindValueDisplays({ bindNumberDisplay });
   bindLightingEvents({ updateMainLightPosition, updateShadowSettings });

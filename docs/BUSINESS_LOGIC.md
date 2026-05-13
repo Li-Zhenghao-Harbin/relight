@@ -88,15 +88,21 @@
 导出类型：
 
 - `flat`：导出当前平面网格与材质位移语义
-- `baked`：将 depth 位移烘焙到顶点位置，生成真实立体几何
+- `baked`：先做 Camera Space Reconstruction（Depth -> Point Cloud），再做 Grid Triangulation（Point Cloud -> Mesh），生成真实立体几何
 
-烘焙流程：
+`baked` 主流程：
 
-1. 读取 displacement 贴图像素
-2. 按 UV 采样深度值
-3. 计算并写入顶点 Z
-4. 重算法线
-5. 清理位移贴图参数，避免下游重复解释
+1. 读取 displacement 贴图像素并恢复 camera space 点云
+2. 按规则网格将点云三角化为 `BufferGeometry`
+3. 生成 UV、重算法线，并复用预览材质贴图
+4. 清理位移贴图参数，避免下游重复解释
+5. 通过 `GLTFExporter` 导出二进制 GLB
+
+兼容回退路径：
+
+- 若点云三角化前置数据不可用，则回退到“按 UV 采样 depth 写入顶点 Z”的传统烘焙流程。
+- `Triangulation 点数上限` 参数用于控制点云采样密度（影响导出网格精度与性能）。
+- UI 会在参数区实时展示预计网格复杂度（网格尺寸、顶点数、三角形数）。
 
 ## 5. 阴影与打光逻辑
 

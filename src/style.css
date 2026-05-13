@@ -90,6 +90,13 @@ body,
   line-height: 1.45;
 }
 
+.param-hint {
+  margin: -2px 0 0;
+  font-size: 12px;
+  color: #9cb0ca;
+  line-height: 1.4;
+}
+
 .group {
   border: 1px solid #25384c;
   border-radius: 10px;

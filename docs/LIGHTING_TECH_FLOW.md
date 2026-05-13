@@ -21,7 +21,8 @@
 
 2. `baked`（立体几何）
    - 先做 Camera Space Reconstruction（Depth -> Point Cloud）
-   - 再将 depth 烘焙到顶点，导出真实起伏网格
+   - 再做 Grid Triangulation（Point Cloud -> Mesh）
+   - 最终导出真实起伏网格
    - 适合大多数平台直接导入后打光，阴影结果更稳定
 
 ---
@@ -78,20 +79,37 @@
    - `z_cam = -z`
 5. 得到 point cloud（`Float32Array`），并保存到运行时状态中供后续步骤使用
 
-当前代码包含自适应采样步长（`stride`），用于控制点云规模并保持导出速度。
+当前代码包含自适应采样步长（`stride`），用于控制点云规模并保持导出速度。  
+并且可以通过 UI 参数 `Triangulation 点数上限`（`#triangulationMaxPoints`）调节重建密度与导出性能平衡。
+页面会实时显示“预计网格”信息（采样网格尺寸 / 顶点数 / 三角形数），便于导出前预估复杂度。
 
-### 3.3 导出 GLB
+### 3.3 Grid Triangulation（点云转网格）
+
+在完成 Camera Space Reconstruction 后，`baked` 导出流程会基于规则采样网格做三角化：
+
+1. 以 `sampledWidth x sampledHeight` 的点云布局构建顶点数组
+2. 为每个顶点生成 UV（`u = x / (W-1)`, `v = 1 - y / (H-1)`）
+3. 按网格单元拆分为两片三角形：
+   - `(i0, i2, i1)`
+   - `(i1, i2, i3)`
+4. 计算法线并生成 `BufferGeometry`
+5. 克隆预览材质并清理位移参数（`displacementMap/Scale/Bias`），避免导出后重复位移
+
+该步骤输出的是可直接导出的真实 mesh，而不是仅用于统计的点云。
+
+### 3.4 导出 GLB
 
 主流程在：`src/features/pipeline/exporter.js`
 
 在完成 Camera Space Reconstruction 之后，进入导出流程并读取 `exportMode`：
 
 - `flat`：直接导出当前网格与材质
-- `baked`：执行 depth 烘焙流程
+- `baked`：执行 Camera Space Reconstruction + Grid Triangulation 并导出真实 mesh
 
-### 3.4 depth 烘焙为真实几何（关键）
+### 3.5 depth 烘焙为真实几何（兼容路径）
 
-当 `exportMode = baked` 时：
+当前实现优先使用 “Point Cloud -> Grid Triangulation” 生成导出网格。  
+若三角化前置数据不可用，则回退到传统顶点位移烘焙：
 
 1. 克隆预览网格
 2. 从 displacement 贴图读取像素数据

@@ -86,6 +86,30 @@ export function createModelPipeline({ state, sceneController, uiController }) {
     listEl.innerHTML = lines.join('');
   }
 
+  function updateTriangulationEstimate() {
+    const estimateEl = document.getElementById('triangulationEstimate');
+    if (!estimateEl) return;
+
+    const depthImage = state.material?.displacementMap?.image;
+    const width = depthImage?.width || 0;
+    const height = depthImage?.height || 0;
+    if (!width || !height) {
+      estimateEl.textContent = '预计网格：需先应用包含 Depth 的贴图';
+      return;
+    }
+
+    const maxPointsInput = document.getElementById('triangulationMaxPoints');
+    const maxPoints = Math.max(1, Number(maxPointsInput?.value) || 250000);
+    const pixelCount = width * height;
+    const stride = Math.max(1, Math.ceil(Math.sqrt(pixelCount / maxPoints)));
+    const sampledWidth = Math.ceil(width / stride);
+    const sampledHeight = Math.ceil(height / stride);
+    const vertexCount = sampledWidth * sampledHeight;
+    const triangleCount = Math.max(0, (sampledWidth - 1) * (sampledHeight - 1) * 2);
+
+    estimateEl.textContent = `预计网格：${sampledWidth}x${sampledHeight}，顶点 ${vertexCount.toLocaleString()}，三角形 ${triangleCount.toLocaleString()}`;
+  }
+
   function disposeTexture(texture) {
     if (texture) texture.dispose();
   }
@@ -211,7 +235,7 @@ export function createModelPipeline({ state, sceneController, uiController }) {
     setStatus(`自动映射完成（${mappedCount}/6）：${detail}`);
   }
 
-  const applyMaps = createMapsApplier({
+  const applyMapsInternal = createMapsApplier({
     state,
     scene,
     setStatus,
@@ -222,6 +246,11 @@ export function createModelPipeline({ state, sceneController, uiController }) {
       disposeCurrentMesh();
     }
   });
+
+  const applyMaps = async () => {
+    await applyMapsInternal();
+    updateTriangulationEstimate();
+  };
 
   const importModelForLighting = createModelImporter({
     state,
@@ -251,6 +280,7 @@ export function createModelPipeline({ state, sceneController, uiController }) {
     updateShadowSettings,
     applyModelShadowFlags,
     importTextureFolder,
-    refreshTextureMappingPreview
+    refreshTextureMappingPreview,
+    updateTriangulationEstimate
   };
 }

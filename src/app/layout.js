@@ -60,6 +60,11 @@ export function createAppLayout() {
           <input id="metalnessValue" type="range" min="0" max="1" step="0.01" value="0.03" />
           <span id="metalnessValueText">0.03</span>
         </label>
+        <label>Triangulation 点数上限
+          <input id="triangulationMaxPoints" type="range" min="20000" max="500000" step="10000" value="250000" />
+          <span id="triangulationMaxPointsValue">250000</span>
+        </label>
+        <p id="triangulationEstimate" class="param-hint">预计网格：需先应用包含 Depth 的贴图</p>
       </section>
 
       <section class="group" data-mode-only="build">

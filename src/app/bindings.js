@@ -60,11 +60,14 @@ function bindRuleDialogEvents({ refreshTextureMappingPreview }) {
   });
 }
 
-function bindTextureInputEvents({ refreshTextureMappingPreview }) {
-  if (!refreshTextureMappingPreview) return;
+function bindTextureInputEvents({ refreshTextureMappingPreview, updateTriangulationEstimate }) {
+  if (!refreshTextureMappingPreview && !updateTriangulationEstimate) return;
   const ids = ['baseMap', 'normalMap', 'roughnessMap', 'f0Map', 'alphaMap', 'depthMap'];
   ids.forEach((id) => {
-    document.getElementById(id)?.addEventListener('change', () => refreshTextureMappingPreview());
+    document.getElementById(id)?.addEventListener('change', () => {
+      refreshTextureMappingPreview?.();
+      updateTriangulationEstimate?.();
+    });
   });
 }
 
@@ -75,12 +78,18 @@ function bindValueDisplays({ bindNumberDisplay }) {
   bindNumberDisplay('normalScale', 'normalScaleValue', (v) => v.toFixed(2));
   bindNumberDisplay('roughnessValue', 'roughnessValueText', (v) => v.toFixed(2));
   bindNumberDisplay('metalnessValue', 'metalnessValueText', (v) => v.toFixed(2));
+  bindNumberDisplay('triangulationMaxPoints', 'triangulationMaxPointsValue', (v) => Math.round(v).toString());
   bindNumberDisplay('lightX', 'lightXValue', (v) => v.toFixed(2));
   bindNumberDisplay('lightY', 'lightYValue', (v) => v.toFixed(2));
   bindNumberDisplay('lightZ', 'lightZValue', (v) => v.toFixed(2));
   bindNumberDisplay('lightIntensity', 'lightIntensityValue', (v) => v.toFixed(2));
   bindNumberDisplay('shadowBias', 'shadowBiasValue', (v) => v.toFixed(4));
   bindNumberDisplay('shadowNormalBias', 'shadowNormalBiasValue', (v) => v.toFixed(3));
+}
+
+function bindTriangulationEvents({ updateTriangulationEstimate }) {
+  if (!updateTriangulationEstimate) return;
+  document.getElementById('triangulationMaxPoints')?.addEventListener('input', updateTriangulationEstimate);
 }
 
 function bindLightingEvents({ updateMainLightPosition, updateShadowSettings }) {
@@ -104,6 +113,7 @@ export function initializeBindings({
   importModelForLighting,
   importTextureFolder,
   refreshTextureMappingPreview,
+  updateTriangulationEstimate,
   updateMainLightPosition,
   updateShadowSettings
 }) {
@@ -111,7 +121,8 @@ export function initializeBindings({
   bindActionEvents({ applyMaps, exportGlb, importModelForLighting });
   bindFolderImportEvents({ importTextureFolder });
   bindRuleDialogEvents({ refreshTextureMappingPreview });
-  bindTextureInputEvents({ refreshTextureMappingPreview });
+  bindTextureInputEvents({ refreshTextureMappingPreview, updateTriangulationEstimate });
   bindValueDisplays({ bindNumberDisplay });
+  bindTriangulationEvents({ updateTriangulationEstimate });
   bindLightingEvents({ updateMainLightPosition, updateShadowSettings });
 }

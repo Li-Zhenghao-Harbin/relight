@@ -30,7 +30,8 @@ const {
   exportGlb,
   updateShadowSettings,
   importTextureFolder,
-  refreshTextureMappingPreview
+  refreshTextureMappingPreview,
+  updateTriangulationEstimate
 } = modelPipeline;
 
 initializeBindings({
@@ -41,11 +42,13 @@ initializeBindings({
   importModelForLighting,
   importTextureFolder,
   refreshTextureMappingPreview,
+  updateTriangulationEstimate,
   updateMainLightPosition,
   updateShadowSettings
 });
 
 refreshTextureMappingPreview();
+updateTriangulationEstimate();
 updateMainLightPosition();
 updateShadowSettings();
 setUiMode(DEFAULT_MODE);

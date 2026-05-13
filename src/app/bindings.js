@@ -79,6 +79,10 @@ function bindValueDisplays({ bindNumberDisplay }) {
   bindNumberDisplay('roughnessValue', 'roughnessValueText', (v) => v.toFixed(2));
   bindNumberDisplay('metalnessValue', 'metalnessValueText', (v) => v.toFixed(2));
   bindNumberDisplay('triangulationMaxPoints', 'triangulationMaxPointsValue', (v) => Math.round(v).toString());
+  bindNumberDisplay('depthHoleFillIters', 'depthHoleFillItersValue', (v) => Math.round(v).toString());
+  bindNumberDisplay('depthBilateralSpatial', 'depthBilateralSpatialValue', (v) => Math.round(v).toString());
+  bindNumberDisplay('depthBilateralRange', 'depthBilateralRangeValue', (v) => v.toFixed(2));
+  bindNumberDisplay('depthEdgeAwareStrength', 'depthEdgeAwareStrengthValue', (v) => v.toFixed(2));
   bindNumberDisplay('lightX', 'lightXValue', (v) => v.toFixed(2));
   bindNumberDisplay('lightY', 'lightYValue', (v) => v.toFixed(2));
   bindNumberDisplay('lightZ', 'lightZValue', (v) => v.toFixed(2));
@@ -89,7 +93,18 @@ function bindValueDisplays({ bindNumberDisplay }) {
 
 function bindTriangulationEvents({ updateTriangulationEstimate }) {
   if (!updateTriangulationEstimate) return;
-  document.getElementById('triangulationMaxPoints')?.addEventListener('input', updateTriangulationEstimate);
+  const ids = [
+    'triangulationMaxPoints',
+    'depthHoleFillIters',
+    'depthBilateralSpatial',
+    'depthBilateralRange',
+    'depthEdgeAwareStrength',
+    'depthRefineEnabled'
+  ];
+  ids.forEach((id) => {
+    const eventName = id === 'depthRefineEnabled' ? 'change' : 'input';
+    document.getElementById(id)?.addEventListener(eventName, updateTriangulationEstimate);
+  });
 }
 
 function bindLightingEvents({ updateMainLightPosition, updateShadowSettings }) {

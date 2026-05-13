@@ -64,6 +64,25 @@ export function createAppLayout() {
           <input id="triangulationMaxPoints" type="range" min="20000" max="500000" step="10000" value="250000" />
           <span id="triangulationMaxPointsValue">250000</span>
         </label>
+        <label>启用 Mesh Refinement
+          <input id="depthRefineEnabled" type="checkbox" checked />
+        </label>
+        <label>Hole Filling 迭代
+          <input id="depthHoleFillIters" type="range" min="0" max="4" step="1" value="2" />
+          <span id="depthHoleFillItersValue">2</span>
+        </label>
+        <label>Bilateral 空间半径
+          <input id="depthBilateralSpatial" type="range" min="1" max="4" step="1" value="2" />
+          <span id="depthBilateralSpatialValue">2</span>
+        </label>
+        <label>Bilateral 深度阈值
+          <input id="depthBilateralRange" type="range" min="0.01" max="0.2" step="0.01" value="0.06" />
+          <span id="depthBilateralRangeValue">0.06</span>
+        </label>
+        <label>Edge-aware 强度
+          <input id="depthEdgeAwareStrength" type="range" min="0" max="1" step="0.01" value="0.4" />
+          <span id="depthEdgeAwareStrengthValue">0.40</span>
+        </label>
         <p id="triangulationEstimate" class="param-hint">预计网格：需先应用包含 Depth 的贴图</p>
       </section>
 

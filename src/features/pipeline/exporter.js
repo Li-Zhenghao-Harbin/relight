@@ -1,15 +1,169 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { getTextureImageData, sampleDepthFromImageData } from './common.js';
+import { getTextureImageData } from './common.js';
+
+function getDepthRefineConfigFromUi() {
+  const enabled = document.getElementById('depthRefineEnabled')?.checked ?? true;
+  const holeFillIters = Math.max(0, Math.round(Number(document.getElementById('depthHoleFillIters')?.value) || 0));
+  const bilateralSpatialRadius = Math.max(1, Math.round(Number(document.getElementById('depthBilateralSpatial')?.value) || 1));
+  const bilateralRangeSigma = Math.max(0.001, Number(document.getElementById('depthBilateralRange')?.value) || 0.06);
+  const edgeAwareStrength = THREE.MathUtils.clamp(
+    Number(document.getElementById('depthEdgeAwareStrength')?.value) || 0,
+    0,
+    1
+  );
+  return {
+    enabled,
+    holeFillIters,
+    bilateralSpatialRadius,
+    bilateralRangeSigma,
+    edgeAwareStrength
+  };
+}
+
+function buildDepthMapFromImageData(depthData) {
+  const { width, height, data } = depthData;
+  const values = new Float32Array(width * height);
+  for (let i = 0; i < values.length; i += 1) {
+    values[i] = data[i * 4] / 255;
+  }
+  return { width, height, values };
+}
+
+function holeFillDepthMap(depthValues, width, height, iterations = 0, holeThreshold = 1 / 255) {
+  if (iterations <= 0) return depthValues;
+  let current = depthValues.slice();
+  const next = new Float32Array(current.length);
+  const offsets = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1]
+  ];
+
+  for (let iter = 0; iter < iterations; iter += 1) {
+    next.set(current);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const idx = y * width + x;
+        if (current[idx] > holeThreshold) continue;
+        let sum = 0;
+        let count = 0;
+        for (const [dx, dy] of offsets) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          const v = current[ny * width + nx];
+          if (v <= holeThreshold) continue;
+          sum += v;
+          count += 1;
+        }
+        if (count > 0) next[idx] = sum / count;
+      }
+    }
+    current = next.slice();
+  }
+
+  return current;
+}
+
+function bilateralDepthSmooth(depthValues, width, height, radius = 2, rangeSigma = 0.06) {
+  const result = new Float32Array(depthValues.length);
+  const spatialSigma = Math.max(1, radius * 0.75);
+  const spatialCoeff = -1 / (2 * spatialSigma * spatialSigma);
+  const rangeCoeff = -1 / (2 * rangeSigma * rangeSigma);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const centerIdx = y * width + x;
+      const centerDepth = depthValues[centerIdx];
+      let weightSum = 0;
+      let valueSum = 0;
+
+      for (let ky = -radius; ky <= radius; ky += 1) {
+        const ny = y + ky;
+        if (ny < 0 || ny >= height) continue;
+        for (let kx = -radius; kx <= radius; kx += 1) {
+          const nx = x + kx;
+          if (nx < 0 || nx >= width) continue;
+          const sampleIdx = ny * width + nx;
+          const sampleDepth = depthValues[sampleIdx];
+          const spatialDist2 = kx * kx + ky * ky;
+          const depthDelta = sampleDepth - centerDepth;
+          const wSpatial = Math.exp(spatialDist2 * spatialCoeff);
+          const wRange = Math.exp(depthDelta * depthDelta * rangeCoeff);
+          const w = wSpatial * wRange;
+          weightSum += w;
+          valueSum += sampleDepth * w;
+        }
+      }
+
+      result[centerIdx] = weightSum > 1e-6 ? valueSum / weightSum : centerDepth;
+    }
+  }
+
+  return result;
+}
+
+function edgeAwareFilterDepth(depthValues, width, height, strength = 0.4) {
+  if (strength <= 0) return depthValues;
+  const smoothed = bilateralDepthSmooth(depthValues, width, height, 1, 0.12);
+  const out = new Float32Array(depthValues.length);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = y * width + x;
+      const center = depthValues[idx];
+      const left = x > 0 ? depthValues[idx - 1] : center;
+      const right = x < width - 1 ? depthValues[idx + 1] : center;
+      const up = y > 0 ? depthValues[idx - width] : center;
+      const down = y < height - 1 ? depthValues[idx + width] : center;
+      const gradient = Math.max(Math.abs(left - right), Math.abs(up - down));
+      const edgeFactor = THREE.MathUtils.clamp(gradient * 20, 0, 1);
+      const t = strength * (1 - edgeFactor);
+      out[idx] = center * (1 - t) + smoothed[idx] * t;
+    }
+  }
+
+  return out;
+}
+
+function refineDepthMap(depthMap, config) {
+  const { width, height } = depthMap;
+  const original = depthMap.values;
+  if (!config.enabled) {
+    return { width, height, values: original.slice() };
+  }
+
+  const holesFilled = holeFillDepthMap(original, width, height, config.holeFillIters);
+  const bilateral = bilateralDepthSmooth(
+    holesFilled,
+    width,
+    height,
+    config.bilateralSpatialRadius,
+    config.bilateralRangeSigma
+  );
+  const edgeAware = edgeAwareFilterDepth(bilateral, width, height, config.edgeAwareStrength);
+
+  return {
+    width,
+    height,
+    values: edgeAware
+  };
+}
 
 function reconstructPointCloudInCameraSpace({
-  depthData,
+  depthMap,
   displacementScale,
   displacementBias,
   fovDeg = 45,
   maxPoints = 250000
 }) {
-  const { width, height } = depthData;
+  const { width, height, values } = depthMap;
   const pixelCount = width * height;
   const stride = Math.max(1, Math.ceil(Math.sqrt(pixelCount / maxPoints)));
   const sampledWidth = Math.ceil(width / stride);
@@ -25,8 +179,8 @@ function reconstructPointCloudInCameraSpace({
   let writeIndex = 0;
   for (let y = 0; y < height; y += stride) {
     for (let x = 0; x < width; x += stride) {
-      const idx = (y * width + x) * 4;
-      const depth = depthData.data[idx] / 255;
+      const idx = y * width + x;
+      const depth = values[idx];
       const zRaw = depth * displacementScale + displacementBias;
       const z = Math.abs(zRaw) < 1e-6 ? 1e-6 : zRaw;
 
@@ -48,6 +202,13 @@ function reconstructPointCloudInCameraSpace({
     sampledWidth,
     sampledHeight
   };
+}
+
+function sampleDepthFromMap(depthMap, u, v) {
+  const { width, height, values } = depthMap;
+  const x = Math.min(width - 1, Math.max(0, Math.round(u * (width - 1))));
+  const y = Math.min(height - 1, Math.max(0, Math.round((1 - v) * (height - 1))));
+  return values[y * width + x];
 }
 
 function getTriangulationMaxPointsFromUi(defaultValue = 250000) {
@@ -131,7 +292,7 @@ function buildTriangulatedMeshFromPointCloud(state) {
   return mesh;
 }
 
-function buildExportMesh(state, exportMode) {
+function buildExportMesh(state, exportMode, refinedDepthMap = null) {
   if (!state.mesh) return null;
   state.reconstructedMeshMeta = null;
   if (exportMode === 'baked') {
@@ -154,8 +315,13 @@ function buildExportMesh(state, exportMode) {
   const positionAttr = exportedMesh.geometry.getAttribute('position');
   if (!uvAttr || !positionAttr) return exportedMesh;
 
-  const depthData = getTextureImageData(depthTex);
-  if (!depthData) return exportedMesh;
+  let depthMap = refinedDepthMap;
+  if (!depthMap) {
+    const depthData = getTextureImageData(depthTex);
+    if (!depthData) return exportedMesh;
+    depthMap = buildDepthMapFromImageData(depthData);
+  }
+  if (!depthMap.width || !depthMap.height) return exportedMesh;
 
   const displacementScale = exportedMesh.material.displacementScale || 0;
   const displacementBias = exportedMesh.material.displacementBias || 0;
@@ -163,7 +329,7 @@ function buildExportMesh(state, exportMode) {
   for (let i = 0; i < positionAttr.count; i += 1) {
     const u = uvAttr.getX(i);
     const v = uvAttr.getY(i);
-    const depth = sampleDepthFromImageData(depthData, u, v);
+    const depth = sampleDepthFromMap(depthMap, u, v);
     const displacedZ = depth * displacementScale + displacementBias;
     positionAttr.setZ(i, displacedZ);
   }
@@ -193,6 +359,7 @@ export function createModelExporter({ state, setStatus, reportStep, clearStepLog
     reportStep?.('导出模式识别', true, isBaked ? 'baked（立体）' : 'flat（平面）');
     setStatus(isBaked ? '正在导出立体 GLB（Depth 烘焙为真实网格）...' : '正在导出平面 GLB...');
 
+    let refinedDepthMap = null;
     if (isBaked) {
       try {
         const depthTex = state.material?.displacementMap;
@@ -209,9 +376,20 @@ export function createModelExporter({ state, setStatus, reportStep, clearStepLog
           return;
         }
 
+        const refineConfig = getDepthRefineConfigFromUi();
+        const rawDepthMap = buildDepthMapFromImageData(depthData);
+        refinedDepthMap = refineDepthMap(rawDepthMap, refineConfig);
+        reportStep?.(
+          'Depth refinement',
+          true,
+          refineConfig.enabled
+            ? `hole=${refineConfig.holeFillIters}，bilateral=${refineConfig.bilateralSpatialRadius}/${refineConfig.bilateralRangeSigma.toFixed(2)}，edgeAware=${refineConfig.edgeAwareStrength.toFixed(2)}`
+            : '已关闭'
+        );
+
         const triangulationMaxPoints = getTriangulationMaxPointsFromUi();
         const result = reconstructPointCloudInCameraSpace({
-          depthData,
+          depthMap: refinedDepthMap,
           displacementScale: state.material?.displacementScale || 0,
           displacementBias: state.material?.displacementBias || 0,
           fovDeg: getCameraFov ? getCameraFov() : 45,
@@ -224,8 +402,8 @@ export function createModelExporter({ state, setStatus, reportStep, clearStepLog
           stride: result.stride,
           sampledWidth: result.sampledWidth,
           sampledHeight: result.sampledHeight,
-          width: depthData.width,
-          height: depthData.height
+          width: refinedDepthMap.width,
+          height: refinedDepthMap.height
         };
 
         reportStep?.(
@@ -241,7 +419,7 @@ export function createModelExporter({ state, setStatus, reportStep, clearStepLog
     }
 
     const exportScene = new THREE.Scene();
-    const meshToExport = buildExportMesh(state, exportMode);
+    const meshToExport = buildExportMesh(state, exportMode, refinedDepthMap);
     if (!meshToExport) {
       reportStep?.('导出网格构建', false);
       setStatus('导出失败：当前没有可导出的网格。', true);

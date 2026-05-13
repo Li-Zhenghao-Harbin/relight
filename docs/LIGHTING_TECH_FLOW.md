@@ -66,22 +66,27 @@
 
 主流程在：`src/features/pipeline/exporter.js`
 
-在 `baked` 导出前，先把 depth 从图像空间恢复到 camera space 点云：
+在 `baked` 导出前，先对 depth 执行 mesh refinement，再恢复到 camera space 点云：
 
 1. 读取 depth 贴图像素（`getTextureImageData`）
-2. 基于相机 FOV 与图像尺寸构建简化内参：
+2. 执行 Depth Refinement（可关闭）：
+   - Hole filling：对低深度孔洞区域做邻域填补
+   - Bilateral depth smooth：在保持局部深度边界的前提下降噪
+   - Edge-aware filtering：按梯度抑制跨边界过度平滑
+3. 基于相机 FOV 与图像尺寸构建简化内参：
    - `fx = fy = (H/2) / tan(FOV/2)`
    - `cx = (W - 1) / 2`, `cy = (H - 1) / 2`
-3. 把 depth 映射为相机深度 `z`
-4. 用针孔模型恢复 3D 点：
+4. 把 depth 映射为相机深度 `z`
+5. 用针孔模型恢复 3D 点：
    - `x_cam = (u - cx) * z / fx`
    - `y_cam = -(v - cy) * z / fy`
    - `z_cam = -z`
-5. 得到 point cloud（`Float32Array`），并保存到运行时状态中供后续步骤使用
+6. 得到 point cloud（`Float32Array`），并保存到运行时状态中供后续步骤使用
 
 当前代码包含自适应采样步长（`stride`），用于控制点云规模并保持导出速度。  
 并且可以通过 UI 参数 `Triangulation 点数上限`（`#triangulationMaxPoints`）调节重建密度与导出性能平衡。
 页面会实时显示“预计网格”信息（采样网格尺寸 / 顶点数 / 三角形数），便于导出前预估复杂度。
+Depth refinement 参数也在 UI 中可调：`depthRefineEnabled`、`depthHoleFillIters`、`depthBilateralSpatial`、`depthBilateralRange`、`depthEdgeAwareStrength`。
 
 ### 3.3 Grid Triangulation（点云转网格）
 
@@ -174,6 +179,7 @@
   - 在导出流程中依次输出：
     - 导出流程初始化
     - 导出模式识别
+    - Depth refinement
     - Camera space reconstruction
     - 导出网格构建
     - GLB 二进制生成

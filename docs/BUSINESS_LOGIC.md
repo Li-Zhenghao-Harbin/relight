@@ -92,17 +92,20 @@
 
 `baked` 主流程：
 
-1. 读取 displacement 贴图像素并恢复 camera space 点云
-2. 按规则网格将点云三角化为 `BufferGeometry`
-3. 生成 UV、重算法线，并复用预览材质贴图
-4. 清理位移贴图参数，避免下游重复解释
-5. 通过 `GLTFExporter` 导出二进制 GLB
+1. 读取 displacement 贴图像素
+2. 执行 mesh refinement（Hole filling / Bilateral / Edge-aware）
+3. 基于 refined depth 恢复 camera space 点云
+4. 按规则网格将点云三角化为 `BufferGeometry`
+5. 生成 UV、重算法线，并复用预览材质贴图
+6. 清理位移贴图参数，避免下游重复解释
+7. 通过 `GLTFExporter` 导出二进制 GLB
 
 兼容回退路径：
 
-- 若点云三角化前置数据不可用，则回退到“按 UV 采样 depth 写入顶点 Z”的传统烘焙流程。
+- 若点云三角化前置数据不可用，则回退到“按 UV 采样 refined depth 写入顶点 Z”的传统烘焙流程。
 - `Triangulation 点数上限` 参数用于控制点云采样密度（影响导出网格精度与性能）。
 - UI 会在参数区实时展示预计网格复杂度（网格尺寸、顶点数、三角形数）。
+- UI 提供 refinement 参数：启用开关、Hole Filling 迭代、Bilateral 空间半径与深度阈值、Edge-aware 强度。
 
 ## 5. 阴影与打光逻辑
 
